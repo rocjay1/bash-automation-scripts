@@ -36,14 +36,12 @@ log() {
     local severity="${2:-INFO}"
     local log_entry="$(date -Iseconds) - $severity - $message"
 
-    # Try appending to log file; if it fails, write to stderr
-    if echo "$log_entry" >> "$LOG_FILE" 2>/dev/null; then
-        # If valid log file write, but it's an error, ALSO echo to stderr for visibility (e.g. cron)
-        if [[ "$severity" == "ERROR" ]]; then
-            echo "$log_entry" >&2
-        fi
-    else
+    if [[ "$severity" == "ERROR" ]]; then
+        # Write to stderr; global redirection handles writing to log file + console
         echo "$log_entry" >&2
+    else
+        # Write directly to log file for non-error messages
+        echo "$log_entry" >> "$LOG_FILE"
     fi
 }
 
@@ -52,15 +50,16 @@ error() {
     local message="${2:-}"
     local code="${3:-1}"
 
-    if [[ -n "$message" ]] ; then
-        log "Error on or near line ${parent_lineno}: ${message}; exiting with status ${code}" "ERROR"
-    else
-        log "Error on or near line ${parent_lineno}; exiting with status ${code}" "ERROR"
+    if [[ -z "$message" ]] ; then
+        local command_str="${BASH_COMMAND:-unknown}"
+        message="Command '${command_str}' failed on or near line ${parent_lineno}"
     fi
+
+    log "${message}; exiting with status ${code}" "ERROR"
     exit "${code}"
 }
 # Trap ERR signal to handle runtime errors
-# trap 'error ${LINENO}' ERR
+trap 'error ${LINENO} "" $?' ERR
 
 # ==============================================================================
 # Main Execution
@@ -73,6 +72,9 @@ fi
 if [ ! -f "$LOG_FILE" ]; then
     touch "$LOG_FILE"
 fi
+
+# Redirect stderr to both the log file and the console (stderr)
+exec 2> >(tee -a "$LOG_FILE" >&2)
 
 log "Starting backup process..."
 
