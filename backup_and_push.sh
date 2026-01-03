@@ -37,7 +37,12 @@ log() {
     local log_entry="$(date -Iseconds) - $severity - $message"
 
     # Try appending to log file; if it fails, write to stderr
-    if ! echo "$log_entry" >> "$LOG_FILE" 2>/dev/null; then
+    if echo "$log_entry" >> "$LOG_FILE" 2>/dev/null; then
+        # If valid log file write, but it's an error, ALSO echo to stderr for visibility (e.g. cron)
+        if [[ "$severity" == "ERROR" ]]; then
+            echo "$log_entry" >&2
+        fi
+    else
         echo "$log_entry" >&2
     fi
 }
@@ -55,7 +60,7 @@ error() {
     exit "${code}"
 }
 # Trap ERR signal to handle runtime errors
-trap 'error ${LINENO}' ERR
+# trap 'error ${LINENO}' ERR
 
 # ==============================================================================
 # Main Execution
@@ -75,7 +80,7 @@ log "Starting backup process..."
 if [ ! -d "$BACKUP_DIR" ]; then
     log "Backup directory not found. Creating and cloning..."
     mkdir -p "$BACKUP_DIR"
-    git clone "$REMOTE_REPO" "$BACKUP_DIR"
+    /usr/bin/git clone "$REMOTE_REPO" "$BACKUP_DIR"
     cd "$BACKUP_DIR"
     log "Successfully created and initialized backup directory."
 else 
@@ -83,14 +88,14 @@ else
     cd "$BACKUP_DIR"
     
     # Safely remove old tarballs if they exist (ignore if missing)
-    git rm --ignore-unmatch ./*.tar.gz
+    /usr/bin/git rm --ignore-unmatch ./*.tar.gz
     
     # Stage any other changes (if any) and commit cleanup
-    git add .
+    /usr/bin/git add .
     
     # Only commit if there are staged changes to avoid empty commit errors
-    if ! git diff --cached --quiet; then
-        git commit -m "Removing old backups"
+    if ! /usr/bin/git diff --cached --quiet; then
+        /usr/bin/git commit -m "Removing old backups"
         log "Successfully committed removal of old backups."
     else
         log "No old backups to remove or clean up."
@@ -104,8 +109,8 @@ log "Finished creating new backup archive."
 
 # Push to Remote
 log "Committing and pushing new backup to GitHub..."
-git add "$BACKUP_FILENAME" 
-git commit -m "Adding new backup: $(date)"
-git pull --rebase
-git push
+/usr/bin/git add .
+/usr/bin/git commit -m "Adding new backup: $(date)"
+/usr/bin/git pull --rebase
+/usr/bin/git push
 log "Successfully committed and pushed new backup."

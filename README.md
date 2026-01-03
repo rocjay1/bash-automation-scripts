@@ -10,6 +10,7 @@ Automates the backup of a local source directory to a remote Git repository.
 - Cleans up old backups in the repository before adding the new one.
 - Pushes the new backup to the remote repository.
 - Logs activities and errors to a log file.
+- Outputs errors to stderr for visibility in cron jobs or CI/CD pipelines.
 - Handles concurrent git changes with `git pull --rebase`.
 
 ### Configuration
