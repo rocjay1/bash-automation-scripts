@@ -18,7 +18,6 @@
 # Enable strict error handling
 set -euo pipefail
 
-
 # ==============================================================================
 # Configuration
 # ==============================================================================
@@ -28,7 +27,7 @@ LOG_FILE="$LOG_DIR/audit.log"
 MARKDOWN_DIR="/var/tmp/audit"
 MARKDOWN_FILE="$MARKDOWN_DIR/AUDIT_$(date -Idate).md"
 
-CHECKS=("ssh" "docker" "google")
+STATUS_CHECKS=("ssh" "docker" "google")
 DU_THRESH=80
 
 # Ensure logging directory exists and
@@ -36,9 +35,10 @@ DU_THRESH=80
 mkdir -p "$LOG_DIR"
 echo "" >> "$LOG_FILE"
 
-# Ensure Markdown file exists
+# Ensure Markdown directory exists and 
+# overwrite any earlier audits 
 mkdir -p "$MARKDOWN_DIR"
-touch "$MARKDOWN_FILE"
+echo "" > "$MARKDOWN_FILE"
 
 # Functions
 log() {
@@ -103,14 +103,18 @@ log "Finished detecting failed logins."
 log "Checking service health..."
 write_md "## Service Pulse"
 write_md "|SERVICE|STATUS|\n|---|---|" 0
-for s in $CHECKS; do
+for s in $"${STATUS_CHECKS[@]}"; do
     case $s in 
         ssh|docker)
-            STATUS=$(systemctl status "$s" | sed -n -e 's/^[[:space:]]*Active: \([[:alpha:]]\+ ([[:alpha:]]\+)\).*/\1/p')
+            if systemctl is-active --quiet "$s"; then
+                STATUS="active"
+            else
+                STATUS="inactive"
+            fi
             write_md "|$s|$STATUS|" 0
         ;;
         google)
-            STATUS=$(curl -Is "https://www.$s.com" | head -n 1 | sed -n 's/.*\([0-9]\{3\}\).*/\1/p')
+            STATUS=$(curl -Is "https://www.$s.com" | head -n 1 | sed -n 's/.*\([0-9]\{3\}\).*/\1/p' || true)
             write_md "|$s|$STATUS|"
         ;;
     esac
@@ -120,9 +124,9 @@ log "Finished checking service health."
 log "Checking system resources..."
 write_md "## Resource Sentinel"
 PARTS_STATUS=$(df | awk "NR > 1 { 
-    gsub(/%/,\"\",$5)
-    if ($5 > $DU_THRESH) {
-        printf(\"%-15s %s\n\", $1, $5)
+    gsub(/%/,\"\",\$5)
+    if (\$5 > $DU_THRESH) {
+        printf(\"%-15s %s\n\", \$1, \$5)
     }
 }" |
 sed 's/\(^\)\|\([[:space:]]\+\)\|\($\)/\|/g')
