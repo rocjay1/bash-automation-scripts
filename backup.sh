@@ -42,12 +42,8 @@ exec >> "$LOG_FILE" 2>&1
 export PATH=/opt/homebrew/bin/:/usr/bin/:$PATH
 
 # Ensure log directory and file exist
-if [ ! -d "$LOG_DIR" ]; then
-    mkdir -p "$LOG_DIR"
-fi
-if [ ! -f "$LOG_FILE" ]; then
-    touch "$LOG_FILE"
-fi
+mkdir -p "$LOG_DIR"
+touch "$LOG_FILE"
 
 log "Starting backup process..."
 
