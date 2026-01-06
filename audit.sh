@@ -1,11 +1,27 @@
 #! /bin/bash
 
-# Strict mode
+# ==============================================================================
+# Script: audit.sh
+# Description: Automates security and system health auditing.
+#              Generates a Markdown report and logs activities.
+#
+# Checks:
+#   - Failed SSH login attempts (brute-force detection)
+#   - Status of critical services (ssh, docker) and connectivity (google)
+#   - Disk usage (alerts if >80%)
+#
+# Output:
+#   - Log: /var/log/bash-automation-scripts/audit.log
+#   - Report: /var/temp/audit/AUDIT_<Date>.md
+# ==============================================================================
+
+# Enable strict error handling
 set -euo pipefail
 
-# Logging
+# Configuration
 LOG_DIR="/var/log/bash-automation-scripts"
-# Create logging directory if it doesn't exist: mkdir -p is idempotent
+
+# Ensure logging directory exists
 mkdir -p "$LOG_DIR"
 LOG_FILE="$LOG_DIR/audit.log"
 echo "" >> "$LOG_FILE"
