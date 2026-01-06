@@ -1,11 +1,29 @@
 #! /bin/bash
 
+# Strict mode
 set -euo pipefail
 
-MARKDOWN_DIR="system_audit"
+# Logging
+LOG_DIR="/var/log/bash-automation-scripts"
+# Create logging directory if it doesn't exist: mkdir -p is idempotent
+mkdir -p "$LOG_DIR"
+LOG_FILE="$LOG_DIR/audit.log"
+echo "" >> "$LOG_FILE"
+
+log() {
+    local message="$1"
+    local log_entry="[$(date -Iseconds)] $message"
+    echo "$log_entry" >> "$LOG_FILE"
+}
+
+# Redirect stdout and stderr to log file
+exec 1>> "$LOG_FILE" 2>&1
+
+# Markdown
+MARKDOWN_DIR="/var/temp/audit"
 mkdir -p "$MARKDOWN_DIR"
-MARKDOWN_FILE="$MARKDOWN_DIR/AUDIT.md"
-echo -n "" > "$MARKDOWN_FILE"
+MARKDOWN_FILE="$MARKDOWN_DIR/AUDIT_$(date -Idate).md"
+touch "$MARKDOWN_FILE"
 
 write_md() {
     local line="$1" 
@@ -20,10 +38,12 @@ write_md() {
     echo -e "$line" >> "$file"
 }
 
+# Main
+log "Starting automated security and pulse audit..."
 write_md "# Automated Security & Pulse Audit"
-
 write_md "## Security Audit"
 
+log "Parsing SSH logs to detect failed logins..."
 # https://askubuntu.com/a/178019
 # Filter for brute-force interactive SSH logins
 FAILED_LOGINS=$(awk '/Failed password for/ { 
@@ -48,9 +68,11 @@ else
     write_md "|COUNT|IP|\n|---|---|" 0
     write_md "$FAILED_LOGINS"
 fi
+log "Finished detecting failed logins."
 
+
+log "Checking service health..."
 write_md "## Service Pulse"
-
 write_md "|SERVICE|STATUS|\n|---|---|" 0
 for s in ssh docker google; do
     case $s in 
@@ -64,9 +86,10 @@ for s in ssh docker google; do
         ;;
     esac
 done
+log "Finished checking service health."
 
+log "Checking system resources..."
 write_md "## Resource Sentinel"
-
 PARTS_STATUS=$(df | awk 'NR > 1 { 
     gsub(/%/,"",$5)
     if ($5 > 80) {
@@ -82,3 +105,4 @@ else
     write_md "|PARTITION|PERCENT FULL|\n|---|---|" 0
     write_md "$PARTS_STATUS" 0
 fi
+log "Finished checking system resources."

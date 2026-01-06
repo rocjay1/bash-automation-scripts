@@ -17,7 +17,7 @@ set -euo pipefail
 # ==============================================================================
 
 LOG_DIR="${HOME}/log/bash-automation-scripts"
-LOG_FILE="$LOG_DIR/backup_and_push.log"
+LOG_FILE="$LOG_DIR/source_backup.log"
 SOURCE_DIR="${HOME}/Source"
 BACKUP_DIR="/tmp/bash-automation-scripts-backup"
 BACKUP_FILENAME="backup.tar.gz"
