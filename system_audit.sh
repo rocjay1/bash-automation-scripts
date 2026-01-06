@@ -52,7 +52,7 @@ for s in ssh docker google; do
     case $s in 
         ssh|docker)
             STATUS=$(systemctl status "$s" | sed -n -e 's/^[[:space:]]*Active: \([[:alpha:]]\+ ([[:alpha:]]\+)\).*/\1/p')
-            write_md "|ssh|$STATUS|" 0
+            write_md "|$s|$STATUS|" 0
         ;;
         google)
             STATUS=$(curl -Is "https://www.$s.com" | head -n 1 | sed -n 's/.*\([0-9]\{3\}\).*/\1/p')
