@@ -18,28 +18,34 @@
 # Enable strict error handling
 set -euo pipefail
 
-# Configuration
-LOG_DIR="/var/log/bash-automation-scripts"
 
-# Ensure logging directory exists
-mkdir -p "$LOG_DIR"
+# ==============================================================================
+# Configuration
+# ==============================================================================
+
+LOG_DIR="/var/log/bash-automation-scripts"
 LOG_FILE="$LOG_DIR/audit.log"
+MARKDOWN_DIR="/var/tmp/audit"
+MARKDOWN_FILE="$MARKDOWN_DIR/AUDIT_$(date -Idate).md"
+
+CHECKS=("ssh" "docker" "google")
+DU_THRESH=80
+
+# Ensure logging directory exists and
+# add newline to log file
+mkdir -p "$LOG_DIR"
 echo "" >> "$LOG_FILE"
 
+# Ensure Markdown file exists
+mkdir -p "$MARKDOWN_DIR"
+touch "$MARKDOWN_FILE"
+
+# Functions
 log() {
     local message="$1"
     local log_entry="[$(date -Iseconds)] $message"
     echo "$log_entry" >> "$LOG_FILE"
 }
-
-# Redirect stdout and stderr to log file
-exec 1>> "$LOG_FILE" 2>&1
-
-# Markdown
-MARKDOWN_DIR="/var/temp/audit"
-mkdir -p "$MARKDOWN_DIR"
-MARKDOWN_FILE="$MARKDOWN_DIR/AUDIT_$(date -Idate).md"
-touch "$MARKDOWN_FILE"
 
 write_md() {
     local line="$1" 
@@ -54,12 +60,19 @@ write_md() {
     echo -e "$line" >> "$file"
 }
 
-# Main
+# ==============================================================================
+# Main Execution
+# ==============================================================================
+
+# Redirect stdout and stderr to log file
+exec 1>> "$LOG_FILE" 2>&1
+
 log "Starting automated security and pulse audit..."
+
 write_md "# Automated Security & Pulse Audit"
-write_md "## Security Audit"
 
 log "Parsing SSH logs to detect failed logins..."
+write_md "## Security Audit"
 # https://askubuntu.com/a/178019
 # Filter for brute-force interactive SSH logins
 FAILED_LOGINS=$(awk '/Failed password for/ { 
@@ -90,7 +103,7 @@ log "Finished detecting failed logins."
 log "Checking service health..."
 write_md "## Service Pulse"
 write_md "|SERVICE|STATUS|\n|---|---|" 0
-for s in ssh docker google; do
+for s in $CHECKS; do
     case $s in 
         ssh|docker)
             STATUS=$(systemctl status "$s" | sed -n -e 's/^[[:space:]]*Active: \([[:alpha:]]\+ ([[:alpha:]]\+)\).*/\1/p')
@@ -106,19 +119,21 @@ log "Finished checking service health."
 
 log "Checking system resources..."
 write_md "## Resource Sentinel"
-PARTS_STATUS=$(df | awk 'NR > 1 { 
-    gsub(/%/,"",$5)
-    if ($5 > 80) {
-        printf("%-15s %s\n", $1, $5)
+PARTS_STATUS=$(df | awk "NR > 1 { 
+    gsub(/%/,\"\",$5)
+    if ($5 > $DU_THRESH) {
+        printf(\"%-15s %s\n\", $1, $5)
     }
-}' |
+}" |
 sed 's/\(^\)\|\([[:space:]]\+\)\|\($\)/\|/g')
 
 if [[ -z "$PARTS_STATUS" ]]; then
     write_md "All partitions healthy." 0
 else
-    write_md "CRITICAL partitions (>80% full):"
+    write_md "CRITICAL partitions (>$DU_THRESH% full):"
     write_md "|PARTITION|PERCENT FULL|\n|---|---|" 0
     write_md "$PARTS_STATUS" 0
 fi
 log "Finished checking system resources."
+
+log "Finished automated security and pulse audit."
