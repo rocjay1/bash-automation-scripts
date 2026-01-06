@@ -1,43 +1,24 @@
 #! /bin/bash
 
-# Strict mode: fail on error, undefined variable, or pipe failure
+# Strict mode
 set -euo pipefail
 
-# Set up logging
-LOG_DIR="${HOME}/log/bash-automation-scripts"
-LOG_FILE="$LOG_DIR/health_check.log"
-if [ ! -d "$LOG_DIR" ]; then
-    mkdir -p "$LOG_DIR"
-fi
-if [ ! -f "$LOG_FILE" ]; then
-    touch "$LOG_FILE"
-fi
+write_md() {
+    local line="$1" 
+    local empty_lines="${2:-1}"
+    local file="${3:-AUDIT.md}"
 
-# Redirect stderr to log file
-exec 2>> "$LOG_FILE" 
-
-# Set up Markdown output
-MARKDOWN_DIR="."
-MARKDOWN_FILE="$MARKDOWN_DIR/AUDIT.md"
-if [ ! -d "$MARKDOWN_DIR" ]; then
-    mkdir -p "$MARKDOWN_DIR"
-fi
-if [ ! -f "$MARKDOWN_FILE" ]; then
-    touch "$MARKDOWN_FILE"
-else
-    echo -n "" > "$MARKDOWN_FILE"
-fi
-
-write() {
-    local line=$1
-    local file=${2-"AUDIT.md"}
-    echo -e "$line\n" >> "$file"
+    i=0
+    while [[ $i -lt $empty_lines ]]; do
+        line="$line\n"
+        ((i++))
+    done
+    echo -e "$line" >> "$file"
 }
 
-# Main logic
-write "# Automated Security & Pulse Audit"
+write_md "# Automated Security & Pulse Audit"
 
-write "## Security Audit"
+write_md "## Security Audit"
 
 # https://askubuntu.com/a/178019
 # Filter for brute-force interactive SSH logins
@@ -57,30 +38,30 @@ head -n 3 |
 sed 's/\(^\)\|\([[:space:]]\+\)\|\($\)/\|/g')
 
 if [[ -z "$FAILED_LOGINS" ]]; then
-    write "No failed login attempts."
+    write_md "No failed login attempts."
 else
-    write "Failed SSH login attempts:"
-    write "|COUNT|IP|\n|---|---|"
-    write "$FAILED_LOGINS"
+    write_md "Failed SSH login attempts:"
+    write_md "|COUNT|IP|\n|---|---|"
+    write_md "$FAILED_LOGINS"
 fi
 
-write "## Service Pulse"
+write_md "## Service Pulse"
 
-write "|SERVICE|STATUS|\n|---|---|"
+write_md "|SERVICE|STATUS|\n|---|---|"
 for s in ssh docker google; do
     case $s in 
         ssh|docker)
             STATUS=$(systemctl status "$s" | sed -n -e 's/^[[:space:]]*Active: \([[:alpha:]]\+ ([[:alpha:]]\+)\).*/\1/p')
-            write "|ssh|$STATUS|"
+            write_md "|ssh|$STATUS|" 0
         ;;
         google)
             STATUS=$(curl -Is "https://www.$s.com" | head -n 1 | sed -n 's/.*\([0-9]\{3\}\).*/\1/p')
-            write "|url|$STATUS|"
+            write_md "|url|$STATUS|"
         ;;
     esac
 done
 
-write "## Resource Sentinel"
+write_md "## Resource Sentinel"
 
 PARTS_STATUS=$(df | awk 'NR > 1 { 
     gsub(/%/,"",$5)
@@ -91,9 +72,9 @@ PARTS_STATUS=$(df | awk 'NR > 1 {
 sed 's/\(^\)\|\([[:space:]]\+\)\|\($\)/\|/g')
 
 if [[ -z "$PARTS_STATUS" ]]; then
-    write "All partitions healthy."
+    write_md "All partitions healthy."
 else
-    write "CRITICAL partitions (>80% full):"
-    write "|PARTITION|PERCENT FULL|\n|---|---|"
-    write "$PARTS_STATUS"
+    write_md "CRITICAL partitions (>80% full):"
+    write_md "|PARTITION|PERCENT FULL|\n|---|---|"
+    write_md "$PARTS_STATUS"
 fi
