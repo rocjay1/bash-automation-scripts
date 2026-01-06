@@ -1,17 +1,21 @@
 #! /bin/bash
 
-# Strict mode
 set -euo pipefail
+
+MARKDOWN_DIR="system_audit"
+mkdir -p "$MARKDOWN_DIR"
+MARKDOWN_FILE="$MARKDOWN_DIR/AUDIT.md"
+echo -n "" > "$MARKDOWN_FILE"
 
 write_md() {
     local line="$1" 
     local empty_lines="${2:-1}"
-    local file="${3:-AUDIT.md}"
+    local file="${3:-$MARKDOWN_FILE}"
 
     i=0
     while [[ $i -lt $empty_lines ]]; do
         line="$line\n"
-        ((i++))
+        ((++i))
     done
     echo -e "$line" >> "$file"
 }
@@ -41,13 +45,13 @@ if [[ -z "$FAILED_LOGINS" ]]; then
     write_md "No failed login attempts."
 else
     write_md "Failed SSH login attempts:"
-    write_md "|COUNT|IP|\n|---|---|"
+    write_md "|COUNT|IP|\n|---|---|" 0
     write_md "$FAILED_LOGINS"
 fi
 
 write_md "## Service Pulse"
 
-write_md "|SERVICE|STATUS|\n|---|---|"
+write_md "|SERVICE|STATUS|\n|---|---|" 0
 for s in ssh docker google; do
     case $s in 
         ssh|docker)
@@ -56,7 +60,7 @@ for s in ssh docker google; do
         ;;
         google)
             STATUS=$(curl -Is "https://www.$s.com" | head -n 1 | sed -n 's/.*\([0-9]\{3\}\).*/\1/p')
-            write_md "|url|$STATUS|"
+            write_md "|$s|$STATUS|"
         ;;
     esac
 done
@@ -72,9 +76,9 @@ PARTS_STATUS=$(df | awk 'NR > 1 {
 sed 's/\(^\)\|\([[:space:]]\+\)\|\($\)/\|/g')
 
 if [[ -z "$PARTS_STATUS" ]]; then
-    write_md "All partitions healthy."
+    write_md "All partitions healthy." 0
 else
     write_md "CRITICAL partitions (>80% full):"
-    write_md "|PARTITION|PERCENT FULL|\n|---|---|"
-    write_md "$PARTS_STATUS"
+    write_md "|PARTITION|PERCENT FULL|\n|---|---|" 0
+    write_md "$PARTS_STATUS" 0
 fi
